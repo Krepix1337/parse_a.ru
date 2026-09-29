@@ -55,3 +55,9 @@ def extract_subtitle(subtitle_text:str) -> str:
 def extract_specs(specs_text: str) -> list:
     cleaned_specs = specs_text.replace('\xa0', ' ')
     return re.findall(r'[А-Я][^А-Я]*', cleaned_specs)
+
+def clean_model_name(raw: str) -> str:
+    match = re.search(r'\d+\s*в\s*продаже', raw)
+    if match:
+        return raw[:match.start()].strip()
+    return raw.strip()

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -10,6 +11,9 @@ from app.parsers.main_parser import main_by_year
 
 bot = Bot(token=settings.TELEGRAM_TOKEN)
 dp = Dispatcher()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class CarsSearch(StatesGroup):
     waiting_for_mark = State()
@@ -84,8 +88,17 @@ async def process_year(message: types.Message, state: FSMContext):
 
     await message.answer(f"🔍 Ищу {mark} {model} {year} год...")
 
-    cars = await main_by_year(mark, model, year)
-
+    try:
+        cars = await main_by_year(mark, model, year)
+    except Exception:
+        logger.exception(f"Ошибка парсинга для {mark} {model} {year}")
+        await message.answer(
+            "⚠️ Не получилось получить данные с auto.ru. "
+            "Возможно, сайт временно недоступен или изменил структуру страницы. "
+            "Попробуйте ещё раз чуть позже."
+        )
+        await state.clear()
+        return
     if not cars:
         await message.answer("❌ Ничего не найдено")
         await state.clear()

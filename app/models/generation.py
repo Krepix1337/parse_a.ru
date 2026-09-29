@@ -10,3 +10,9 @@ class Generation(Base):
     generation_name = Column(String, nullable=True)
     year_start = Column(Integer, nullable=True)
     year_end = Column(Integer, nullable=True)
+
+    # Коды из URL auto.ru: /cars/{mark_code}/{model_code}/{gen_code}/all/
+    # Нужны, чтобы открывать поиск сразу по ссылке, без кликов по дропдаунам
+    mark_code = Column(String, nullable=True)
+    model_code = Column(String, nullable=True)
+    gen_code = Column(String, nullable=True)

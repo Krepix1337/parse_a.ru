@@ -1,5 +1,7 @@
 from app.parsers.cleaners import extract_subtitle, extract_specs, parse_year_mileage, clean_price
+from urllib.parse import urljoin
 
+BASE_URL = "https://auto.ru"
 
 async def parse_card(card, mark: str, model: str, generation: str):
     # Заголовок
@@ -8,7 +10,8 @@ async def parse_card(card, mark: str, model: str, generation: str):
 
     if await link_element.count() > 0:
         title = await link_element.text_content()
-        url = await link_element.get_attribute('href')
+        raw_href = await link_element.get_attribute('href')
+        url = urljoin(BASE_URL, raw_href) if raw_href else "нет"
     else:
         title = "нет"
         url = "нет"

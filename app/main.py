@@ -3,7 +3,7 @@ import sys
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.parsers.main_parser import main as parse_cars
+from app.parsers.main_parser import main_by_year
 
 from app.core.config import settings
 import logging
@@ -19,7 +19,7 @@ app = FastAPI(title="Auto.ru Parser")
 class SearchRequest(BaseModel):
     mark: str
     model: str
-    generation: str
+    year: int
 
 class CarResponse(BaseModel):
     mark: str
@@ -40,8 +40,8 @@ async def root():
 @app.post("/search", response_model=list[CarResponse])
 async def search(request: SearchRequest):
     try:
-        logger.info(f"Поиск: {request.mark} {request.model} {request.generation}")
-        cars = await parse_cars(request.mark, request.model, request.generation)
+        logger.info(f"Поиск: {request.mark} {request.model} {request.year}")
+        cars = await main_by_year(request.mark, request.model, request.year)
         logger.info(f"Найдено {len(cars)} машин")
         return cars
     except Exception as e:
@@ -50,4 +50,4 @@ async def search(request: SearchRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,4 +1,4 @@
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.car import Car
 from app.models.generation import Generation
@@ -36,7 +36,6 @@ async def save_car(session: AsyncSession, car_data: dict):
         if not changes:
             print(f"Машина {car_data['url']} не изменилась")
 
-        print(f"Обновлена машина {car_data['url']}: {', '.join(changes)}")
         await session.commit()
         return existing_car
 
@@ -62,7 +61,15 @@ async def save_generation(session: AsyncSession, generation_data: dict):
     existing_generation = result.scalar_one_or_none()
 
     if existing_generation:
-        print(f"Уже есть: {generation_data['mark']} {generation_data['model']} {generation_data['generation_name']}")
+        # Backfill: строка сохранена до появления кодов — дописываем их
+        if existing_generation.gen_code is None and generation_data.get("gen_code"):
+            existing_generation.mark_code = generation_data["mark_code"]
+            existing_generation.model_code = generation_data["model_code"]
+            existing_generation.gen_code = generation_data["gen_code"]
+            await session.commit()
+            print(f"Дописаны коды: {generation_data['mark']} {generation_data['model']} {generation_data['generation_name']}")
+        else:
+            print(f"Уже есть: {generation_data['mark']} {generation_data['model']} {generation_data['generation_name']}")
         return existing_generation
 
     gen = Generation(**generation_data)
@@ -73,16 +80,25 @@ async def save_generation(session: AsyncSession, generation_data: dict):
     return gen
 
 
-async def find_generation(session: AsyncSession, mark: str, model: str, year: int) -> str | None:
+def _to_code(text: str) -> str:
+    return text.lower().replace(" ", "").replace("-", "").replace("_", "")
+
+
+async def find_generation(session: AsyncSession, mark: str, model: str, year: int) -> Generation | None:
     result = await session.execute(
-        select(Generation).where(
+        select(Generation)
+        .where(
             and_(
-                Generation.mark.ilike(mark),
-                Generation.model.ilike(model),
+                # Пользователь может ввести и название ("Audi"), и код ("audi") — ищем по обоим
+                or_(Generation.mark.ilike(mark), func.replace(Generation.mark_code, "_", "") == _to_code(mark)),
+                or_(Generation.model.ilike(model), func.replace(Generation.model_code, "_", "") == _to_code(model)),
                 Generation.year_start <= year,
                 Generation.year_end >= year,
+                Generation.gen_code.is_not(None),  # без кода не сможем построить URL
             )
         )
+        # На стыке поколений год попадает в два (2015: B8 рест. и B9) — берём более новое
+        .order_by(Generation.year_start.desc())
+        .limit(1)
     )
-    generation = result.scalar_one_or_none()
-    return generation.generation_name if generation else None
+    return result.scalar_one_or_none()

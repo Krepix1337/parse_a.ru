@@ -1,51 +1,34 @@
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
+from app.parsers.captcha import wait_if_captcha
+
+REGION = "yaroslavl"
+CARD_SELECTOR = ".ListingCars__universalSnippetWrapper"
 
 
-async def search_cars(mark: str, model: str, generation: str):
+def build_search_url(mark_code: str, model_code: str, gen_code: str) -> str:
+    # Фильтр "марка + модель + поколение" auto.ru хранит прямо в адресе страницы,
+    # поэтому вместо кликов по дропдаунам можно сразу открыть нужный URL
+    return f"https://auto.ru/{REGION}/cars/{mark_code}/{model_code}/{gen_code}/all/"
+
+
+async def search_cars(mark_code: str, model_code: str, gen_code: str):
     playwright = await async_playwright().start()
     browser = await playwright.chromium.launch(headless=False)
     page = await browser.new_page()
-    await page.goto("https://auto.ru/yaroslavl/cars/all/")
-    # await page.wait_for_load_state("networkidle")
-    # await page.evaluate("window.scrollTo(0, 100)")
 
-    # Марка
-    await page.wait_for_selector('[placeholder="Марка"]', timeout=30000)
-    # await page.screenshot(path="error.png")
-    await page.get_by_placeholder("Марка").click()
-    # await page.wait_for_selector('[role="menuitem"]', timeout=30000)
-    # await page.get_by_role("menuitem", name=mark).first.click()
-    await page.get_by_role("textbox", name="Марка").fill(mark)
-    await page.locator(f'.ListItem2-YfpWi:has-text("{mark}")').first.click()
+    url = build_search_url(mark_code, model_code, gen_code)
+    print(f"Открываю {url}")
+    await page.goto(url, wait_until="domcontentloaded")
+    await wait_if_captcha(page)
 
-    # Модель
-    await page.wait_for_selector('[placeholder="Модель"]', timeout=30000)
-    await page.get_by_placeholder("Модель").click()
-    # await page.get_by_role("menuitem", name=model).first.wait_for(state="visible", timeout=30000)
-    # await page.get_by_role("menuitem", name=model).first.click()
-    await page.get_by_role("textbox", name="Модель").fill(model)
-    await page.locator(f'.ListItem2-YfpWi:has-text("{model}")').first.click()
+    # Ждём, пока появится хотя бы одна карточка. Если объявлений нет —
+    # карточки не появятся никогда, поэтому ловим таймаут и отдаём пустой список
+    try:
+        await page.wait_for_selector(CARD_SELECTOR, timeout=15000)
+    except PlaywrightTimeoutError:
+        print("Карточки не появились — объявлений нет (или страница не загрузилась)")
+        return playwright, page, browser, []
 
-    # Поколение
-    await page.get_by_placeholder("Поколение").click()
-    # await page.get_by_role("checkbox", name=generation).first.wait_for(state="visible", timeout=30000)
-    # await page.get_by_role("checkbox", name=generation).first.click()
-    await page.locator(f'.Checkbox__text:has-text("{generation}")').first.click()
-
-    # Показать + ожидание загрузки
-    await page.get_by_role("button", name="Показать").first.wait_for(state="visible", timeout=30000)
-    old_price = await page.locator('[class*="ListingItemUniversal__price"]').first.text_content()
-    await page.get_by_role("button", name="Показать").first.click()
-
-    print("Жду загрузку страницы...")
-    await page.wait_for_function('''
-        oldPrice => {
-            const priceEl = document.querySelector('[class*="ListingItemUniversal__price"]');
-            return priceEl && priceEl.textContent !== oldPrice;
-        }
-    ''', arg=old_price)
-    # await page.wait_for_selector('.ListingCars__universalSnippetWrapper', timeout=30000)
-
-    cards = await page.locator(".ListingCars__universalSnippetWrapper").all()
-
+    cards = await page.locator(CARD_SELECTOR).all()
     return playwright, page, browser, cards

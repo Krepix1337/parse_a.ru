@@ -3,12 +3,15 @@ from app.parsers.fetcher import search_cars as fetch_cars
 from app.parsers.card_parser import parse_card
 from app.database.crud import save_car, find_generation
 from app.database.database import async_session_maker
+from app.models.generation import Generation
 
-async def main(mark: str, model: str, generation: str):
-    playwright, page, browser, cards = await fetch_cars(mark, model, generation)
+
+async def main(gen: Generation):
+    """Парсит объявления одного поколения. Коды — для URL, названия — для записи в БД."""
+    playwright, page, browser, cards = await fetch_cars(gen.mark_code, gen.model_code, gen.gen_code)
 
     try:
-        tasks = [parse_card(card, mark, model, generation) for card in cards]
+        tasks = [parse_card(card, gen.mark, gen.model, gen.generation_name) for card in cards]
         cars_data = await asyncio.gather(*tasks)
 
         async with async_session_maker() as session:
@@ -32,14 +35,14 @@ async def main_by_year(mark: str, model: str, year: int):
         print(f"❌ Не найдено поколение для {mark} {model} {year}")
         return []
 
-    print(f"✅ Найдено поколение: {generation}")
+    print(f"✅ Найдено поколение: {generation.generation_name} ({generation.gen_code})")
 
-    # 2. Запускаем существующий парсер с найденным поколением
-    return await main(mark, model, generation)
+    # 2. Парсим объявления этого поколения
+    return await main(generation)
 
 
 if __name__ == '__main__':
-    result = asyncio.run(main_by_year("acura", "mdx", 2014))
+    result = asyncio.run(main_by_year("audi", "a4", 2013))
     print(f"\n✅ Готово! Найдено {len(result)} машин")
     for car in result[:3]:
         print(f"  - {car['title']} | {car['price']} ₽ | {car['year']} г.")
