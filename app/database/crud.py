@@ -60,18 +60,6 @@ async def save_generation(session: AsyncSession, generation_data: dict):
     )
     existing_generation = result.scalar_one_or_none()
 
-    if existing_generation:
-        # Backfill: строка сохранена до появления кодов — дописываем их
-        if existing_generation.gen_code is None and generation_data.get("gen_code"):
-            existing_generation.mark_code = generation_data["mark_code"]
-            existing_generation.model_code = generation_data["model_code"]
-            existing_generation.gen_code = generation_data["gen_code"]
-            await session.commit()
-            print(f"Дописаны коды: {generation_data['mark']} {generation_data['model']} {generation_data['generation_name']}")
-        else:
-            print(f"Уже есть: {generation_data['mark']} {generation_data['model']} {generation_data['generation_name']}")
-        return existing_generation
-
     gen = Generation(**generation_data)
     session.add(gen)
     await session.commit()

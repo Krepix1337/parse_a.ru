@@ -18,7 +18,7 @@ MODEL_RE = re.compile(r"^/catalog/cars/([a-z0-9_]+)/([a-z0-9_]+)/?$")
 GEN_RE = re.compile(r"^/catalog/cars/([a-z0-9_]+)/([a-z0-9_]+)/(\d+)(?:/.*)?$")
 
 types = ["Седан", "Лимузин", "Пикап", "Хэтчбек", "Универсал", "Лифтбек", "Минивэн", "Купе", "Кабриолет",
-                 "Родстер", "Тарга"]
+                 "Родстер", "Тарга", "Внедорожник", "Компактвэн", "Фургон", "Микровэн", "Фастбек", "Микроавтобус", "Ландо"]
 
 EXCLUDED_MODEL_NAMES = {"Двигатели", "Все", "Популярные"}
 
@@ -53,6 +53,7 @@ async def parse_models(page, mark_code: str) -> dict[str, str]:
     await wait_if_captcha(page)
 
     models = {}
+    seen_models = set()
     links = await page.locator("a[href*='/catalog/cars/']").all()
     for a in links:
         href = await a.get_attribute("href") or ""
@@ -61,10 +62,12 @@ async def parse_models(page, mark_code: str) -> dict[str, str]:
         if not m or m.group(1) != mark_code:
             continue
         model_code = m.group(2)
+        if model_code in seen_models:
+            continue
+        seen_models.add(model_code)
         if model_code == 'all':
             continue
-        # name = (await a.text_content() or model_code).strip()
-        # models[model_code] = name
+
         raw_name = (await a.text_content() or model_code).strip()
         name = clean_model_name(raw_name)
 
@@ -204,7 +207,7 @@ async def debug_main():
     browser = await playwright.chromium.launch(headless=False)
     page = await browser.new_page()
     try:
-        gens = await parse_generations(page, mark_code="audi", model_code="a4")
+        gens = await parse_models(page, mark_code="audi")
         print(f"\nИтого извлечено поколений: {len(gens)}")
         for g in gens:
             print(g)
@@ -213,5 +216,5 @@ async def debug_main():
         await playwright.stop()
 
 if __name__ == "__main__":
-    asyncio.run(parse_catalog(limit_marks=3))
+    asyncio.run(parse_catalog())
     # asyncio.run(debug_main())

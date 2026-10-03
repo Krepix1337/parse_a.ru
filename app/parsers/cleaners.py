@@ -24,21 +24,6 @@ def parse_year_mileage(condition_text:str) -> tuple[int, int]:
     mileage_str = condition_text[4:]
     mileage_clean = re.sub(r'\D', '', mileage_str)
 
-    # parts = condition_text.split(', ')
-    #
-    # if len(parts) != 2:
-    #     return 0, 0
-
-    # Вариант с заменами
-    # year_part = parts[0].replace(' год', '')
-    # year = int(year_part) if year_part.isdigit() else 0
-    #
-    # mileage_part = parts[1].replace(' км', '').replace('\xa0', ' ').replace(' ', '')
-    # mileage = int(mileage_part) if mileage_part.isdigit() else 0
-
-    # year_part = re.sub(r'\D', '', parts[0])
-    # mileage_part = re.sub(r'\D', '', parts[1])
-
     year = int(year_str) if year_str.isdigit() else 0
     mileage = int(mileage_clean) if mileage_clean else 0
 
